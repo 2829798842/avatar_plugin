@@ -74,7 +74,6 @@ def check_and_install_dependency():
 
 
 get_memes = None
-load_memes = None
 
 
 
@@ -106,13 +105,11 @@ class MemeManager:
 
         try:
             logger.debug("开始加载表情包...")
-            # load_memes() 不需要参数，会自动加载默认目录
-            # 直接使用全局变量（已在_check_and_load_meme_generator中设置）
-            if load_memes is None or get_memes is None:
+            # meme-generator 0.2.2+ 直接调用 get_memes() 即可自动加载
+            if get_memes is None:
                 logger.error("meme-generator 函数未正确加载")
                 return
                 
-            load_memes()
             all_memes = get_memes()
             
             logger.debug(f"get_memes() 返回 {len(all_memes)} 个表情包")
@@ -150,19 +147,17 @@ class MemeManager:
     @classmethod
     def _check_and_load_meme_generator(cls):
         """检查并加载meme_generator模块"""
-        global get_memes, load_memes
+        global get_memes
 
         # 如果已经加载过，直接返回
         if get_memes is not None:
             return True
 
-        # 尝试导入 - meme-generator 0.2.x 的正确导入方式
+        # 尝试导入
         try:
             from meme_generator import get_memes as _get_memes
-            from meme_generator import load_memes as _load_memes
 
             get_memes = _get_memes
-            load_memes = _load_memes
             logger.info("成功导入 meme-generator 模块")
             return True
         except ImportError as e:
@@ -171,10 +166,8 @@ class MemeManager:
             if check_and_install_dependency():
                 try:
                     from meme_generator import get_memes as _get_memes
-                    from meme_generator import load_memes as _load_memes
 
                     get_memes = _get_memes
-                    load_memes = _load_memes
                     logger.info("重新导入 meme-generator 成功")
                     return True
                 except ImportError as e2:
