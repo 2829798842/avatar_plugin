@@ -156,10 +156,10 @@ class MemeManager:
         if get_memes is not None:
             return True
 
-        # 尝试导入
+        # 尝试导入 - meme-generator 0.2.x 的正确导入方式
         try:
             from meme_generator import get_memes as _get_memes
-            from meme_generator.manager import load_memes as _load_memes
+            from meme_generator import load_memes as _load_memes
 
             get_memes = _get_memes
             load_memes = _load_memes
@@ -171,7 +171,7 @@ class MemeManager:
             if check_and_install_dependency():
                 try:
                     from meme_generator import get_memes as _get_memes
-                    from meme_generator.manager import load_memes as _load_memes
+                    from meme_generator import load_memes as _load_memes
 
                     get_memes = _get_memes
                     load_memes = _load_memes
