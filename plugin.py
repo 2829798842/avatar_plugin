@@ -71,7 +71,6 @@ def check_and_install_dependency():
 
 get_memes = None
 load_memes = None
-memes_dir = None
 
 
 
@@ -101,7 +100,8 @@ class MemeManager:
             return
 
         try:
-            load_memes(memes_dir())
+            # load_memes() 不需要参数，会自动加载默认目录
+            load_memes()
             all_memes = get_memes()
 
             for meme in all_memes:
@@ -137,7 +137,7 @@ class MemeManager:
     @classmethod
     def _check_and_load_meme_generator(cls):
         """检查并加载meme_generator模块"""
-        global get_memes, load_memes, memes_dir
+        global get_memes, load_memes
 
         # 如果已经加载过，直接返回
         if get_memes is not None:
@@ -147,11 +147,9 @@ class MemeManager:
         try:
             from meme_generator import get_memes as _get_memes
             from meme_generator.manager import load_memes as _load_memes
-            from meme_generator.dirs import memes_dir as _memes_dir
 
             get_memes = _get_memes
             load_memes = _load_memes
-            memes_dir = _memes_dir
             return True
         except ImportError:
             # 尝试安装
@@ -159,11 +157,9 @@ class MemeManager:
                 try:
                     from meme_generator import get_memes as _get_memes
                     from meme_generator.manager import load_memes as _load_memes
-                    from meme_generator.dirs import memes_dir as _memes_dir
 
                     get_memes = _get_memes
                     load_memes = _load_memes
-                    memes_dir = _memes_dir
                     return True
                 except ImportError:
                     return False
