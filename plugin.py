@@ -99,14 +99,23 @@ class MemeManager:
 
     def _load_memes(self):
         # 首次初始化时检查并加载依赖
-        if not self._check_and_load_meme_generator():
+        result = self._check_and_load_meme_generator()
+        if not result:
             logger.warning("meme-generator未安装或加载失败，表情包功能不可用")
             return
 
         try:
+            logger.debug("开始加载表情包...")
             # load_memes() 不需要参数，会自动加载默认目录
+            # 直接使用全局变量（已在_check_and_load_meme_generator中设置）
+            if load_memes is None or get_memes is None:
+                logger.error("meme-generator 函数未正确加载")
+                return
+                
             load_memes()
             all_memes = get_memes()
+            
+            logger.debug(f"get_memes() 返回 {len(all_memes)} 个表情包")
 
             for meme in all_memes:
                 MemeManager._memes[meme.key] = meme
@@ -117,7 +126,7 @@ class MemeManager:
             MemeManager.is_initialized = True
             logger.info(f"已加载 {len(all_memes)} 个表情包")
         except Exception as e:
-            logger.error(f"加载表情包失败: {e}")
+            logger.error(f"加载表情包失败: {e}", exc_info=True)
 
     def find_meme(self, key: str):
         if not self.is_initialized:
@@ -154,8 +163,10 @@ class MemeManager:
 
             get_memes = _get_memes
             load_memes = _load_memes
+            logger.info("成功导入 meme-generator 模块")
             return True
-        except ImportError:
+        except ImportError as e:
+            logger.warning(f"导入 meme-generator 失败: {e}")
             # 尝试安装
             if check_and_install_dependency():
                 try:
@@ -164,9 +175,15 @@ class MemeManager:
 
                     get_memes = _get_memes
                     load_memes = _load_memes
+                    logger.info("重新导入 meme-generator 成功")
                     return True
-                except ImportError:
+                except ImportError as e2:
+                    logger.error(f"安装后仍无法导入 meme-generator: {e2}")
                     return False
+            logger.error("无法安装 meme-generator")
+            return False
+        except Exception as e:
+            logger.error(f"加载 meme-generator 时发生未知错误: {e}", exc_info=True)
             return False
 
     async def generate(self, meme, images=None, texts=None, args=None):
