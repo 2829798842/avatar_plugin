@@ -3,6 +3,7 @@ import random
 import subprocess
 import sys
 from typing import List, Tuple, Type, Optional
+from io import BytesIO
 
 from src.plugin_system import (
     BasePlugin,
@@ -19,6 +20,12 @@ from src.common.logger import get_logger
 from .avatar_analyzer import AvatarAnalyzer
 
 logger = get_logger("qq_avatar_meme")
+
+get_memes = None
+MemeImage = None
+ImageNumberMismatch = None
+TextNumberMismatch = None
+TextOverLength = None
 
 
 def check_and_install_dependency():
@@ -73,11 +80,6 @@ def check_and_install_dependency():
 
 
 
-get_memes = None
-
-
-
-
 class MemeManager:
     """表情包管理器"""
 
@@ -116,7 +118,7 @@ class MemeManager:
 
             for meme in all_memes:
                 MemeManager._memes[meme.key] = meme
-                for keyword in meme.keywords:
+                for keyword in meme.info.keywords:
                     MemeManager._memes[keyword.lower()] = meme
 
             MemeManager._meme_list = all_memes
@@ -147,7 +149,7 @@ class MemeManager:
     @classmethod
     def _check_and_load_meme_generator(cls):
         """检查并加载meme_generator模块"""
-        global get_memes
+        global get_memes, MemeImage, ImageNumberMismatch, TextNumberMismatch, TextOverLength
 
         # 如果已经加载过，直接返回
         if get_memes is not None:
@@ -156,8 +158,18 @@ class MemeManager:
         # 尝试导入
         try:
             from meme_generator import get_memes as _get_memes
+            from meme_generator import Image as _MemeImage
+            from meme_generator import (
+                ImageNumberMismatch as _ImageNumberMismatch,
+                TextNumberMismatch as _TextNumberMismatch,
+                TextOverLength as _TextOverLength,
+            )
 
             get_memes = _get_memes
+            MemeImage = _MemeImage
+            ImageNumberMismatch = _ImageNumberMismatch
+            TextNumberMismatch = _TextNumberMismatch
+            TextOverLength = _TextOverLength
             logger.info("成功导入 meme-generator 模块")
             return True
         except ImportError as e:
@@ -166,8 +178,18 @@ class MemeManager:
             if check_and_install_dependency():
                 try:
                     from meme_generator import get_memes as _get_memes
+                    from meme_generator import Image as _MemeImage
+                    from meme_generator import (
+                        ImageNumberMismatch as _ImageNumberMismatch,
+                        TextNumberMismatch as _TextNumberMismatch,
+                        TextOverLength as _TextOverLength,
+                    )
 
                     get_memes = _get_memes
+                    MemeImage = _MemeImage
+                    ImageNumberMismatch = _ImageNumberMismatch
+                    TextNumberMismatch = _TextNumberMismatch
+                    TextOverLength = _TextOverLength
                     logger.info("重新导入 meme-generator 成功")
                     return True
                 except ImportError as e2:
@@ -179,11 +201,55 @@ class MemeManager:
             logger.error(f"加载 meme-generator 时发生未知错误: {e}", exc_info=True)
             return False
 
-    async def generate(self, meme, images=None, texts=None, args=None):
+    def generate(self, meme, images=None, texts=None, args=None):
+        """生成表情包
+        
+        Args:
+            meme: Meme对象
+            images: 图片列表 (bytes或MemeImage对象)
+            texts: 文字列表
+            args: 额外参数
+            
+        Returns:
+            BytesIO对象或None
+        """
         try:
-            return meme(images=images or [], texts=texts or [], args=args or {})
+            # 准备图片数据
+            meme_images = []
+            if images:
+                for img in images:
+                    if isinstance(img, bytes):
+                        if MemeImage is not None:
+                            meme_images.append(MemeImage("", img))
+                        else:
+                            logger.error("MemeImage类未加载")
+                            return None
+                    else:
+                        meme_images.append(img)
+
+            # 调用meme.generate()
+            result = meme.generate(meme_images or [], texts or [], args or {})
+
+            # 检查是否是错误类型
+            if ImageNumberMismatch and isinstance(result, ImageNumberMismatch):
+                logger.error(f"图片数量不符: 应为 {result.min}~{result.max}, 实际 {result.actual}")
+                return None
+            elif TextNumberMismatch and isinstance(result, TextNumberMismatch):
+                logger.error(f"文字数量不符: 应为 {result.min}~{result.max}, 实际 {result.actual}")
+                return None
+            elif TextOverLength and isinstance(result, TextOverLength):
+                logger.error(f"文字过长: {result.text}")
+                return None
+
+            # 正常返回应该是bytes
+            if isinstance(result, bytes):
+                return BytesIO(result)
+            else:
+                logger.error(f"生成表情包返回了未知类型: {type(result)}")
+                return None
+
         except Exception as e:
-            logger.error(f"生成表情包失败: {e}")
+            logger.error(f"生成表情包失败: {e}", exc_info=True)
             return None
 
 
@@ -219,10 +285,10 @@ class MemeMenuCommand(BaseCommand):
 
         categories = {}
         for meme in enabled_memes[:50]:
-            tag = list(meme.tags)[0] if meme.tags else "其他"
+            tag = list(meme.info.tags)[0] if meme.info.tags else "其他"
             if tag not in categories:
                 categories[tag] = []
-            keywords = "、".join(meme.keywords[:2]) if meme.keywords else meme.key
+            keywords = "、".join(meme.info.keywords[:2]) if meme.info.keywords else meme.key
             categories[tag].append(keywords)
 
         for category, memes in categories.items():
@@ -255,7 +321,7 @@ class MemeGenerateCommand(BaseCommand):
             return False, f"未找到: {meme_key}", True
 
         texts = params_str.split() if params_str else []
-        result = await meme_mgr.generate(meme, texts=texts)
+        result = meme_mgr.generate(meme, texts=texts)
 
         if result:
             image_base64 = base64.b64encode(result.getvalue()).decode()
@@ -300,7 +366,7 @@ class AutoMemeAction(BaseAction):
         if not meme:
             return False, "没有可用的表情包"
 
-        result = await meme_mgr.generate(meme, texts=texts)
+        result = meme_mgr.generate(meme, texts=texts)
 
         if result:
             image_base64 = base64.b64encode(result.getvalue()).decode()
