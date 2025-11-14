@@ -1,0 +1,55 @@
+{
+  "manifest_version": 1,
+  "name": "QQ头像表情包生成插件",
+  "version": "1.0.0",
+  "description": "基于meme-generator的表情包生成插件，支持获取QQ头像并生成表情包，同时支持头像识图分析功能",
+  "author": {
+    "name": "litroenade"
+  },
+  "license": "GPL-v3.0",
+  
+  "host_application": {
+    "min_version": "0.8.0"
+  },
+  
+  "keywords": ["meme", "avatar", "表情包", "头像", "图像识别"],
+  "categories": ["Entertainment", "Image Processing"],
+  
+  "default_locale": "zh-CN",
+  
+  "plugin_info": {
+    "is_built_in": false,
+    "plugin_type": "entertainment",
+    "components": [
+      {
+        "type": "command",
+        "name": "meme_menu",
+        "description": "查看表情包生成菜单",
+        "pattern": "/menu"
+      },
+      {
+        "type": "command",
+        "name": "meme_generate",
+        "description": "生成指定表情包",
+        "pattern": "/meme <meme_key> [texts] [users]"
+      },
+      {
+        "type": "action",
+        "name": "auto_meme",
+        "description": "智能选择并生成表情包"
+      },
+      {
+        "type": "action",
+        "name": "analyze_avatar",
+        "description": "分析用户头像并存储描述"
+      }
+    ],
+    "features": [
+      "支持/menu查看所有可用表情包",
+      "支持/meme命令手动生成表情包",
+      "支持麦麦智能选择表情包发送",
+      "支持获取QQ用户头像",
+      "支持使用视觉模型分析头像并存储描述"
+    ]
+  }
+}
