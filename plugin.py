@@ -24,48 +24,52 @@ logger = get_logger("qq_avatar_meme")
 def check_and_install_dependency():
     """检查并安装 meme-generator 依赖"""
     try:
-        import meme_generator
-        return True
-    except ImportError:
-        logger.info("未找到 meme-generator，正在自动安装...")
-
-        # 检查是否有 uv
-        has_uv = False
-        try:
-            result = subprocess.run(
-                ["uv", "--version"],
-                capture_output=True,
-                text=True,
-                timeout=5
-            )
-            has_uv = result.returncode == 0
-        except (FileNotFoundError, subprocess.TimeoutExpired):
-            has_uv = False
-
-        # 根据是否有 uv 选择安装方式
-        try:
-            if has_uv:
-                logger.info("使用 uv pip 安装 meme-generator...")
-                subprocess.check_call(
-                    ["uv", "pip", "install", "meme-generator"],
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE
-                )
-            else:
-                logger.info("使用 pip 安装 meme-generator...")
-                subprocess.check_call(
-                    [sys.executable, "-m", "pip", "install", "meme-generator"],
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE
-                )
-            logger.info("meme-generator 安装成功")
+        import importlib.util
+        spec = importlib.util.find_spec("meme_generator")
+        if spec is not None:
             return True
-        except subprocess.CalledProcessError as e:
-            logger.error(f"安装 meme-generator 失败: {e}")
-            return False
-        except Exception as e:
-            logger.error(f"安装过程出错: {e}")
-            return False
+    except (ImportError, ValueError):
+        pass
+
+    logger.info("未找到 meme-generator，正在自动安装...")
+
+    # 检查是否有 uv
+    has_uv = False
+    try:
+        result = subprocess.run(
+            ["uv", "--version"],
+            capture_output=True,
+            text=True,
+            timeout=5
+        )
+        has_uv = result.returncode == 0
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        has_uv = False
+
+    # 根据是否有 uv 选择安装方式
+    try:
+        if has_uv:
+            logger.info("使用 uv pip 安装 meme-generator...")
+            subprocess.check_call(
+                ["uv", "pip", "install", "meme-generator"],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE
+            )
+        else:
+            logger.info("使用 pip 安装 meme-generator...")
+            subprocess.check_call(
+                [sys.executable, "-m", "pip", "install", "meme-generator"],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE
+            )
+        logger.info("meme-generator 安装成功")
+        return True
+    except subprocess.CalledProcessError as e:
+        logger.error(f"安装 meme-generator 失败: {e}")
+        return False
+    except Exception as e:
+        logger.error(f"安装过程出错: {e}")
+        return False
 
 
 
@@ -358,7 +362,7 @@ class QQAvatarMemePlugin(BasePlugin):
         "avatar": "头像分析配置",
     }
 
-    config_schema = {
+    config_schema: dict = {
         "plugin": {
             "enabled": ConfigField(
                 type=bool,
@@ -391,6 +395,16 @@ class QQAvatarMemePlugin(BasePlugin):
             ),
         },
     }
+
+    def __init__(self, plugin_dir: str):
+        """初始化插件"""
+        super().__init__(plugin_dir)
+        # 初始化时加载MemeManager，确保表情包功能可用
+        meme_mgr = MemeManager.get_instance()
+        if meme_mgr.is_initialized:
+            logger.info(f"表情包管理器已初始化，共加载 {len(meme_mgr.get_all_memes())} 个表情包")
+        else:
+            logger.warning("表情包管理器初始化失败，表情包功能不可用")
 
     def get_plugin_components(self) -> List[Tuple[ComponentInfo, Type]]:
         components = []
