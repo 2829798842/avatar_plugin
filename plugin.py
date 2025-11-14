@@ -68,17 +68,10 @@ def check_and_install_dependency():
             return False
 
 
-# 在导入前检查依赖
-_dependency_available = check_and_install_dependency()
 
-if _dependency_available:
-    from meme_generator import get_memes
-    from meme_generator.manager import load_memes
-    from meme_generator.dirs import memes_dir
-else:
-    get_memes = None
-    load_memes = None
-    memes_dir = None
+get_memes = None
+load_memes = None
+memes_dir = None
 
 
 
@@ -102,8 +95,9 @@ class MemeManager:
             self._load_memes()
 
     def _load_memes(self):
-        if not _dependency_available:
-            logger.error("meme-generator 依赖不可用")
+        # 首次初始化时检查并加载依赖
+        if not self._check_and_load_meme_generator():
+            logger.warning("meme-generator未安装或加载失败，表情包功能不可用")
             return
 
         try:
@@ -139,6 +133,41 @@ class MemeManager:
         if not self.is_initialized or not self._meme_list:
             return None
         return random.choice(self._meme_list)
+
+    @classmethod
+    def _check_and_load_meme_generator(cls):
+        """检查并加载meme_generator模块"""
+        global get_memes, load_memes, memes_dir
+
+        # 如果已经加载过，直接返回
+        if get_memes is not None:
+            return True
+
+        # 尝试导入
+        try:
+            from meme_generator import get_memes as _get_memes
+            from meme_generator.manager import load_memes as _load_memes
+            from meme_generator.dirs import memes_dir as _memes_dir
+
+            get_memes = _get_memes
+            load_memes = _load_memes
+            memes_dir = _memes_dir
+            return True
+        except ImportError:
+            # 尝试安装
+            if check_and_install_dependency():
+                try:
+                    from meme_generator import get_memes as _get_memes
+                    from meme_generator.manager import load_memes as _load_memes
+                    from meme_generator.dirs import memes_dir as _memes_dir
+
+                    get_memes = _get_memes
+                    load_memes = _load_memes
+                    memes_dir = _memes_dir
+                    return True
+                except ImportError:
+                    return False
+            return False
 
     async def generate(self, meme, images=None, texts=None, args=None):
         try:
